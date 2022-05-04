@@ -48,9 +48,9 @@ internal class WebSocketStream : Stream, IValueTaskSource<object?>
         throw new NotSupportedException();
     }
 
-    public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+    public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        await _ws.SendAsync(buffer, WebSocketMessageType.Binary, endOfMessage: false, cancellationToken);
+        return _ws.SendAsync(buffer, WebSocketMessageType.Binary, endOfMessage: false, cancellationToken);
     }
 
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
