@@ -11,7 +11,7 @@ builder.WebHost.UseTunnelTransport(o =>
 
 builder.WebHost.ConfigureKestrel(o =>
 {
-    // Add the endpoint
+    // TCP
     // o.Listen(IPAddress.Loopback, 5005);
 
     // WebSockets
