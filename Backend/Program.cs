@@ -6,15 +6,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseTunnelTransport(o =>
 {
     o.MaxConnectionCount = 1;
-    o.Transport = TransportType.TCP;
+    o.Transport = TransportType.HTTP2;
 });
 
 builder.WebHost.ConfigureKestrel(o =>
 {
     // Add the endpoint
-    o.Listen(IPAddress.Loopback, 5005);
+    // o.Listen(IPAddress.Loopback, 5005);
 
-    //  new UriEndPoint(new("https://localhost:7244/connect")));
+    // WebSockets
+    // o.Listen(new UriEndPoint(new("https://localhost:7244/connect-ws")));
+
+    // H2
+    o.Listen(new UriEndPoint(new("https://localhost:7244/connect-h2")));
 });
 
 var app = builder.Build();

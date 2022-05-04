@@ -62,10 +62,36 @@ app.Map("{*path}", async (IHttpForwarder forwarder, HttpContext context) =>
     return Results.Empty;
 });
 
+app.MapPost("/connect-h2", async (HttpContext context, IHostApplicationLifetime lifetime) =>
+{
+    // HTTP/2 duplex stream
+    if (context.Request.Protocol != HttpProtocol.Http2)
+    {
+        return Results.BadRequest();
+    }
+
+    var stream = new DuplexHttpStream(context);
+
+    using var reg = lifetime.ApplicationStopping.Register(() => stream.Shutdown());
+
+    // Keep reusing this connection while, it's still open on the backend
+    while (!context.RequestAborted.IsCancellationRequested)
+    {
+        // Make this connection available for requests
+        channel.Writer.TryWrite(stream);
+
+        await stream.StreamCompleteTask;
+
+        stream.Reset();
+    }
+
+    return Results.Empty;
+});
+
 // This path should only be exposed on an internal port, the backend connects
 // to this endpoint to register a connection with a specific cluster. To further secure this, authentication
 // could be added (shared secret, JWT etc etc)
-app.MapGet("/connect", async (HttpContext context, IHostApplicationLifetime lifetime) =>
+app.MapGet("/connect-ws", async (HttpContext context, IHostApplicationLifetime lifetime) =>
 {
     if (!context.WebSockets.IsWebSocketRequest)
     {

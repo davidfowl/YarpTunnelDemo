@@ -15,6 +15,10 @@ internal class TunnelConnectionListener : IConnectionListener
     private readonly TunnelOptions _options;
     private readonly CancellationTokenSource _closedCts = new();
     private readonly SocketConnectionContextFactory _contextFactory = new(new SocketConnectionFactoryOptions(), NullLogger.Instance);
+    private readonly HttpMessageInvoker _httpMessageInvoker = new(new SocketsHttpHandler
+    {
+        EnableMultipleHttp2Connections = true
+    });
 
     public TunnelConnectionListener(TunnelOptions options, EndPoint endpoint)
     {
@@ -24,14 +28,13 @@ internal class TunnelConnectionListener : IConnectionListener
 
         switch (options.Transport)
         {
+            case TransportType.HTTP2:
             case TransportType.WebSockets:
                 if (endpoint is not UriEndPoint)
                 {
-                    throw new NotSupportedException("UriEndPoint is required for websocket transport");
+                    throw new NotSupportedException($"UriEndPoint is required for {options.Transport} transport");
                 }
                 break;
-            case TransportType.HTTP2:
-                throw new NotImplementedException("I haven't implemented this one yet");
             case TransportType.TCP:
                 if (endpoint is not IPEndPoint)
                 {
@@ -58,6 +61,7 @@ internal class TunnelConnectionListener : IConnectionListener
             {
                 TransportType.WebSockets => await WebSocketConnectionContext.ConnectAsync(((UriEndPoint)EndPoint).Uri, cancellationToken),
                 TransportType.TCP => await ConnectSocketAsync((IPEndPoint)EndPoint),
+                TransportType.HTTP2 => await HttpClientConnectionContext.ConnectAsync(_httpMessageInvoker, ((UriEndPoint)EndPoint).Uri, cancellationToken),
                 _ => throw new NotSupportedException(),
             });
 
