@@ -1,10 +1,12 @@
-﻿using System.Net.WebSockets;
+﻿using System.Diagnostics;
+using System.Net.WebSockets;
 using System.Threading.Tasks.Sources;
 
 internal class WebSocketStream : Stream, IValueTaskSource<object?>
 {
     private readonly WebSocket _ws;
     private ManualResetValueTaskSourceCore<object?> _tcs = new() { RunContinuationsAsynchronously = true };
+    private readonly object _sync = new();
 
     public WebSocketStream(WebSocket ws)
     {
@@ -65,12 +67,46 @@ internal class WebSocketStream : Stream, IValueTaskSource<object?>
         return result.Count;
     }
 
+    internal void Shutdown()
+    {
+        Debug.Assert(!Thread.CurrentThread.IsThreadPoolThread);
+        _ws.Abort();
+
+        // The shutdown path is currently synchronous but at least we're not blocking a threadpool thread
+        // Attempt a graceful close
+        //using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        //_ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", timeout.Token).GetAwaiter().GetResult();
+        // Wait for closed to be sent back otherwise abort
+        //if (_ws.State != WebSocketState.Closed)
+        //{
+        //    _ws.Abort();
+        //}
+
+        lock (_sync)
+        {
+            if (GetStatus(_tcs.Version) != ValueTaskSourceStatus.Pending)
+            {
+                return;
+            }
+
+            _tcs.SetResult(null);
+        }
+    }
+
     protected override void Dispose(bool disposing)
     {
-        // This might seem evil but we're using dispose to know if the stream
-        // has been given discarded by http client. We trigger the continuation and take back ownership
-        // of it here.
-        _tcs.SetResult(null);
+        lock (_sync)
+        {
+            if (GetStatus(_tcs.Version) != ValueTaskSourceStatus.Pending)
+            {
+                return;
+            }
+
+            // This might seem evil but we're using dispose to know if the stream
+            // has been given discarded by http client. We trigger the continuation and take back ownership
+            // of it here.
+            _tcs.SetResult(null);
+        }
     }
 
     public object? GetResult(short token)

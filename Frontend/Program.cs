@@ -35,7 +35,7 @@ app.Map("{*path}", async (IHttpForwarder forwarder, HttpContext context) =>
 // This path should only be exposed on an internal port, the backend connects
 // to this endpoint to register a connection with a specific cluster. To further secure this, authentication
 // could be added (shared secret, JWT etc etc)
-app.MapGet("/connect", async (HttpContext context) =>
+app.MapGet("/connect", async (HttpContext context, IHostApplicationLifetime lifetime) =>
 {
     if (!context.WebSockets.IsWebSocketRequest)
     {
@@ -47,6 +47,9 @@ app.MapGet("/connect", async (HttpContext context) =>
     var ws = await context.WebSockets.AcceptWebSocketAsync();
 
     var stream = new WebSocketStream(ws);
+
+    // We should make this more graceful
+    using var reg = lifetime.ApplicationStopping.Register(() => stream.Shutdown());
 
     // Keep reusing this connection while, it's still open on the backend
     while (ws.State == WebSocketState.Open)
