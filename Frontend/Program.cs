@@ -29,7 +29,7 @@ app.Map("{*path}", async (IHttpForwarder forwarder, HttpContext context) =>
     // This is hardcoded to a single backend, but that's just for the demo
     await forwarder.SendAsync(context, "http://woah/", client);
 
-    return Results.Extensions.Empty();
+    return Results.Empty;
 });
 
 // This path should only be exposed on an internal port, the backend connects
@@ -62,7 +62,7 @@ app.MapGet("/connect", async (HttpContext context, IHostApplicationLifetime life
         stream.Reset();
     }
 
-    return Results.Extensions.Empty();
+    return Results.Empty;
 });
 
 app.Run();
