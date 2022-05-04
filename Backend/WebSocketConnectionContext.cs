@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Http.Connections.Client;
 
 internal class WebSocketConnectionContext : HttpConnection
 {
-    private readonly TaskCompletionSource _executionTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource _cts = new();
     private WebSocket? _underlyingWebSocket;
 
@@ -13,8 +12,6 @@ internal class WebSocketConnectionContext : HttpConnection
         base(options, null)
     {
     }
-
-    public Task ExecutionTask => _executionTcs.Task;
 
     public override CancellationToken ConnectionClosed
     {
@@ -32,12 +29,6 @@ internal class WebSocketConnectionContext : HttpConnection
     {
         _cts.Cancel();
         _underlyingWebSocket?.Abort();
-    }
-
-    public override ValueTask DisposeAsync()
-    {
-        _executionTcs.TrySetResult();
-        return base.DisposeAsync();
     }
 
     internal static async ValueTask<WebSocketConnectionContext> ConnectAsync(Uri uri, CancellationToken cancellationToken)

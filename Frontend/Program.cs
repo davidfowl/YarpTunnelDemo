@@ -1,14 +1,44 @@
+using System.Net;
 using System.Net.WebSockets;
 using System.Threading.Channels;
+using Microsoft.AspNetCore.Connections;
 using Yarp.ReverseProxy.Forwarder;
 
+// The queue of available connections. In a real implementation, we'd key this by cluster
+var channel = Channel.CreateUnbounded<Stream>();
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.WebHost.ConfigureKestrel(o =>
+{
+    // https 7207
+    o.ListenLocalhost(7244, c => c.UseHttps());
+
+    // http
+    o.ListenLocalhost(5244);
+
+    // TCP for tunnel
+    o.Listen(IPAddress.Loopback, 5005, c => c.Run(async context =>
+    {
+        var stream = new ConnectionContextStream(context);
+
+        // This doesn't have a great way to map to individual clusters, but for demo
+        // purposes, show how TCP can be used to connections from the backend
+        while (!context.ConnectionClosed.IsCancellationRequested)
+        {
+            // Make this connection available for requests
+            channel.Writer.TryWrite(stream);
+
+            await stream.StreamCompleteTask;
+
+            stream.Reset();
+        }
+    }));
+});
+
 builder.Services.AddHttpForwarder();
 
 var app = builder.Build();
-
-// The queue of available connections. In a real implementation, we'd key this by cluster
-var channel = Channel.CreateUnbounded<WebSocketStream>();
 
 var handler = new SocketsHttpHandler
 {

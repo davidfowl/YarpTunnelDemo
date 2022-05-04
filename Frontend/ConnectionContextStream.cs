@@ -1,16 +1,17 @@
-﻿using System.Diagnostics;
-using System.Net.WebSockets;
+﻿using System.Buffers;
+using System.IO.Pipelines;
 using System.Threading.Tasks.Sources;
+using Microsoft.AspNetCore.Connections;
 
-internal class WebSocketStream : Stream, IValueTaskSource<object?>
+internal class ConnectionContextStream : Stream, IValueTaskSource<object?>
 {
-    private readonly WebSocket _ws;
+    private readonly ConnectionContext _connectionContext;
     private ManualResetValueTaskSourceCore<object?> _tcs = new() { RunContinuationsAsynchronously = true };
     private readonly object _sync = new();
 
-    public WebSocketStream(WebSocket ws)
+    public ConnectionContextStream(ConnectionContext connectionContext)
     {
-        _ws = ws;
+        _connectionContext = connectionContext;
     }
 
     internal ValueTask<object?> StreamCompleteTask => new(this, _tcs.Version);
@@ -54,37 +55,63 @@ internal class WebSocketStream : Stream, IValueTaskSource<object?>
         return Task.CompletedTask;
     }
 
-    public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+    public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        return _ws.SendAsync(buffer, WebSocketMessageType.Binary, endOfMessage: false, cancellationToken);
+        await _connectionContext.Transport.Output.WriteAsync(buffer, cancellationToken);
     }
 
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        var result = await _ws.ReceiveAsync(buffer, cancellationToken);
+        ReadResult result = await _connectionContext.Transport.Input.ReadAsync(cancellationToken).ConfigureAwait(false);
+        return HandleReadResult(result, buffer.Span);
+    }
 
-        if (result.MessageType == WebSocketMessageType.Close)
+    private int HandleReadResult(ReadResult result, Span<byte> buffer)
+    {
+        if (result.IsCanceled)
         {
-            return 0;
+            throw new OperationCanceledException();
         }
 
-        return result.Count;
+        ReadOnlySequence<byte> sequence = result.Buffer;
+        long bufferLength = sequence.Length;
+        SequencePosition consumed = sequence.Start;
+
+        try
+        {
+            if (bufferLength != 0)
+            {
+                int actual = (int)Math.Min(bufferLength, buffer.Length);
+
+                ReadOnlySequence<byte> slice = actual == bufferLength ? sequence : sequence.Slice(0, actual);
+                consumed = slice.End;
+                slice.CopyTo(buffer);
+
+                return actual;
+            }
+
+            if (result.IsCompleted)
+            {
+                return 0;
+            }
+        }
+        finally
+        {
+            _connectionContext.Transport.Input.AdvanceTo(consumed);
+        }
+
+        return 0;
+    }
+
+    public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
+    {
+        // Delegate to CopyToAsync on the PipeReader
+        return _connectionContext.Transport.Input.CopyToAsync(destination, cancellationToken);
     }
 
     internal void Shutdown()
     {
-        Debug.Assert(!Thread.CurrentThread.IsThreadPoolThread);
-        _ws.Abort();
-
-        // The shutdown path is currently synchronous but at least we're not blocking a threadpool thread
-        // Attempt a graceful close
-        //using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        //_ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", timeout.Token).GetAwaiter().GetResult();
-        // Wait for closed to be sent back otherwise abort
-        //if (_ws.State != WebSocketState.Closed)
-        //{
-        //    _ws.Abort();
-        //}
+        _connectionContext.Abort();
 
         lock (_sync)
         {

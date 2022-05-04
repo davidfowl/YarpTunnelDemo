@@ -1,29 +1,49 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
-using System.Net.WebSockets;
+using System.Net.Sockets;
 using Microsoft.AspNetCore.Connections;
-using Microsoft.AspNetCore.Http.Connections;
-using Microsoft.AspNetCore.Http.Connections.Client;
+using Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets;
+using Microsoft.Extensions.Logging.Abstractions;
 
 /// <summary>
 /// This has the core logic that creates and maintains connections to the proxu.
 /// </summary>
 internal class TunnelConnectionListener : IConnectionListener
 {
-    private readonly Uri _uri;
     private readonly SemaphoreSlim _connectionLock;
     private readonly ConcurrentDictionary<ConnectionContext, ConnectionContext> _connections = new();
     private readonly TunnelOptions _options;
-    private CancellationTokenSource _closedCts = new();
+    private readonly CancellationTokenSource _closedCts = new();
+    private readonly SocketConnectionContextFactory _contextFactory = new(new SocketConnectionFactoryOptions(), NullLogger.Instance);
 
-    public TunnelConnectionListener(TunnelOptions options, Uri uri)
+    public TunnelConnectionListener(TunnelOptions options, EndPoint endpoint)
     {
-        _uri = uri;
         _options = options;
         _connectionLock = new(options.MaxConnectionCount);
+        EndPoint = endpoint;
+
+        switch (options.Transport)
+        {
+            case TransportType.WebSockets:
+                if (endpoint is not UriEndPoint)
+                {
+                    throw new NotSupportedException("UriEndPoint is required for websocket transport");
+                }
+                break;
+            case TransportType.HTTP2:
+                throw new NotImplementedException("I haven't implemented this one yet");
+            case TransportType.TCP:
+                if (endpoint is not IPEndPoint)
+                {
+                    throw new NotSupportedException("IPEndPoint is required for tcp transport");
+                }
+                break;
+            default:
+                break;
+        }
     }
 
-    public EndPoint EndPoint { get; init; } = default!;
+    public EndPoint EndPoint { get; }
 
     public async ValueTask<ConnectionContext?> AcceptAsync(CancellationToken cancellationToken = default)
     {
@@ -34,7 +54,12 @@ internal class TunnelConnectionListener : IConnectionListener
             // Kestrel will keep an active accept call open as long as the transport is active
             await _connectionLock.WaitAsync(cancellationToken);
 
-            var connection = await WebSocketConnectionContext.ConnectAsync(_uri, cancellationToken);
+            var connection = new TrackLifetimeConnectionContext(_options.Transport switch
+            {
+                TransportType.WebSockets => await WebSocketConnectionContext.ConnectAsync(((UriEndPoint)EndPoint).Uri, cancellationToken),
+                TransportType.TCP => await ConnectSocketAsync((IPEndPoint)EndPoint),
+                _ => throw new NotSupportedException(),
+            });
 
             // Track this connection lifetime
             _connections.TryAdd(connection, connection);
@@ -56,6 +81,13 @@ internal class TunnelConnectionListener : IConnectionListener
         {
             return null;
         }
+    }
+
+    private async ValueTask<ConnectionContext> ConnectSocketAsync(IPEndPoint endPoint)
+    {
+        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+        await socket.ConnectAsync(endPoint);
+        return _contextFactory.Create(socket);
     }
 
     public async ValueTask DisposeAsync()
