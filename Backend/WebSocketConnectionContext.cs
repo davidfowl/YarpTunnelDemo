@@ -1,18 +1,19 @@
 ﻿using System.IO.Pipelines;
 using System.Net;
+using System.Net.WebSockets;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Http.Features;
 
-/// <summary>
-/// This exists solely to track the lifetime of the connection
-/// </summary>
 internal class WebSocketConnectionContext : ConnectionContext
 {
     private readonly ConnectionContext _connection;
     private readonly TaskCompletionSource _executionTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly CancellationTokenSource _cts = new();
+    private readonly WebSocket _underlyingWebSocket;
 
-    public WebSocketConnectionContext(ConnectionContext connection)
+    public WebSocketConnectionContext(WebSocket underlyingWebSocket, ConnectionContext connection)
     {
+        _underlyingWebSocket = underlyingWebSocket;
         _connection = connection;
     }
 
@@ -52,18 +53,22 @@ internal class WebSocketConnectionContext : ConnectionContext
 
     public override CancellationToken ConnectionClosed
     {
-        get => _connection.ConnectionClosed;
-        set => _connection.ConnectionClosed = value;
+        get => _cts.Token;
+        set { }
     }
 
     public override void Abort()
     {
         _connection.Abort();
+        _cts.Cancel();
+        _underlyingWebSocket.Abort();
     }
 
     public override void Abort(ConnectionAbortedException abortReason)
     {
         _connection.Abort(abortReason);
+        _cts.Cancel();
+        _underlyingWebSocket.Abort();
     }
 
     public override ValueTask DisposeAsync()
