@@ -40,13 +40,10 @@ internal class WebSocketTunnelConnectionListener : IConnectionListener
                 Url = _uri,
                 Transports = HttpTransportType.WebSockets,
                 SkipNegotiation = true,
-                WebSocketConfiguration = c =>
-                {
-                    c.KeepAliveInterval = TimeSpan.FromSeconds(5);
-                },
                 WebSocketFactory = async (context, cancellationToken) =>
                 {
                     underlyingWebSocket = new ClientWebSocket();
+                    underlyingWebSocket.Options.KeepAliveInterval = TimeSpan.FromSeconds(5);
                     await underlyingWebSocket.ConnectAsync(context.Uri, cancellationToken);
                     return underlyingWebSocket;
                 }
