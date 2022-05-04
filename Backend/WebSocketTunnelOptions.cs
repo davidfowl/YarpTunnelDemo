@@ -1,4 +1,4 @@
 ﻿public class WebSocketTunnelOptions
 {
-    public int MaxConnectionCount { get; set; } = 1;
+    public int MaxConnectionCount { get; set; } = 10;
 }
