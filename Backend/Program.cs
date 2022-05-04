@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Connections;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.UseWebSocketTunnel(o => o.MaxConnectionCount = 10);
+builder.WebHost.UseTunnelTransport(o => o.MaxConnectionCount = 10);
 builder.WebHost.ConfigureKestrel(o =>
 {
     // Add the endpoint

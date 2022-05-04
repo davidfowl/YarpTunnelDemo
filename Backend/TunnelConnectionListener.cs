@@ -8,15 +8,15 @@ using Microsoft.AspNetCore.Http.Connections.Client;
 /// <summary>
 /// This has the core logic that creates and maintains connections to the proxu.
 /// </summary>
-internal class WebSocketTunnelConnectionListener : IConnectionListener
+internal class TunnelConnectionListener : IConnectionListener
 {
     private readonly Uri _uri;
     private readonly SemaphoreSlim _connectionLock;
     private readonly ConcurrentDictionary<ConnectionContext, ConnectionContext> _connections = new();
-    private readonly WebSocketTunnelOptions _options;
+    private readonly TunnelOptions _options;
     private CancellationTokenSource _closedCts = new();
 
-    public WebSocketTunnelConnectionListener(WebSocketTunnelOptions options, Uri uri)
+    public TunnelConnectionListener(TunnelOptions options, Uri uri)
     {
         _uri = uri;
         _options = options;
@@ -34,25 +34,8 @@ internal class WebSocketTunnelConnectionListener : IConnectionListener
             // Kestrel will keep an active accept call open as long as the transport is active
             await _connectionLock.WaitAsync(cancellationToken);
 
-            ClientWebSocket? underlyingWebSocket = null;
-            var options = new HttpConnectionOptions
-            {
-                Url = _uri,
-                Transports = HttpTransportType.WebSockets,
-                SkipNegotiation = true,
-                WebSocketFactory = async (context, cancellationToken) =>
-                {
-                    underlyingWebSocket = new ClientWebSocket();
-                    underlyingWebSocket.Options.KeepAliveInterval = TimeSpan.FromSeconds(5);
-                    await underlyingWebSocket.ConnectAsync(context.Uri, cancellationToken);
-                    return underlyingWebSocket;
-                }
-            };
+            var connection = await WebSocketConnectionContext.ConnectAsync(_uri, cancellationToken);
 
-            var httpConnection = new HttpConnection(options, null);
-            await httpConnection.StartAsync(TransferFormat.Binary, cancellationToken);
-
-            var connection = new WebSocketConnectionContext(underlyingWebSocket!, httpConnection);
             // Track this connection lifetime
             _connections.TryAdd(connection, connection);
 

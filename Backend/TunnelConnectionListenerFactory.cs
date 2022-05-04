@@ -2,10 +2,10 @@
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Options;
 
-public class WebSocketTunnelConnectionListenerFactory : IConnectionListenerFactory
+public class TunnelConnectionListenerFactory : IConnectionListenerFactory
 {
-    private readonly WebSocketTunnelOptions _options;
-    public WebSocketTunnelConnectionListenerFactory(IOptions<WebSocketTunnelOptions> options)
+    private readonly TunnelOptions _options;
+    public TunnelConnectionListenerFactory(IOptions<TunnelOptions> options)
     {
         _options = options.Value;
     }
@@ -14,7 +14,7 @@ public class WebSocketTunnelConnectionListenerFactory : IConnectionListenerFacto
     {
         if (endpoint is UriEndPoint uri)
         {
-            return new(new WebSocketTunnelConnectionListener(_options, uri.Uri) { EndPoint = endpoint });
+            return new(new TunnelConnectionListener(_options, uri.Uri) { EndPoint = endpoint });
         }
 
         throw new NotSupportedException();
