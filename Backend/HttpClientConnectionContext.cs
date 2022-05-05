@@ -12,7 +12,7 @@ internal class HttpClientConnectionContext : ConnectionContext,
                 IConnectionTransportFeature,
                 IDuplexPipe
 {
-    private readonly TaskCompletionSource<object> _executionTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _executionTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private HttpClientConnectionContext()
     {
@@ -50,6 +50,8 @@ internal class HttpClientConnectionContext : ConnectionContext,
     {
         HttpResponseMessage.Dispose();
 
+        _executionTcs.TrySetCanceled();
+
         Input.CancelPendingRead();
         Output.CancelPendingFlush();
     }
@@ -57,6 +59,8 @@ internal class HttpClientConnectionContext : ConnectionContext,
     public override ValueTask DisposeAsync()
     {
         HttpResponseMessage.Dispose();
+
+        _executionTcs.TrySetResult();
 
         return base.DisposeAsync();
     }
