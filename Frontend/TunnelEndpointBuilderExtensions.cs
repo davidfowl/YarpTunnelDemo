@@ -11,9 +11,9 @@ public static class TunnelEndpointBuilderExtensions
         return services;
     }
 
-    public static void MapTunnelEndpoints(this IEndpointRouteBuilder routes)
+    public static IEndpointConventionBuilder MapHttp2Tunnel(this IEndpointRouteBuilder routes, string path)
     {
-        routes.MapPost("/connect-h2", static async (HttpContext context, string clusterId, TunnelClientFactory tunnelFactory, IHostApplicationLifetime lifetime) =>
+        return routes.MapPost(path, static async (HttpContext context, string clusterId, TunnelClientFactory tunnelFactory, IHostApplicationLifetime lifetime) =>
         {
             // HTTP/2 duplex stream
             if (context.Request.Protocol != HttpProtocol.Http2)
@@ -40,11 +40,11 @@ public static class TunnelEndpointBuilderExtensions
 
             return Results.Empty;
         });
+    }
 
-        // This path should only be exposed on an internal port, the backend connects
-        // to this endpoint to register a connection with a specific cluster. To further secure this, authentication
-        // could be added (shared secret, JWT etc etc)
-        routes.MapGet("/connect-ws", static async (HttpContext context, string clusterId, TunnelClientFactory tunnelFactory, IHostApplicationLifetime lifetime) =>
+    public static IEndpointConventionBuilder MapWebSocketTunnel(this IEndpointRouteBuilder routes, string path)
+    {
+        return routes.MapGet(path, static async (HttpContext context, string clusterId, TunnelClientFactory tunnelFactory, IHostApplicationLifetime lifetime) =>
         {
             if (!context.WebSockets.IsWebSocketRequest)
             {
