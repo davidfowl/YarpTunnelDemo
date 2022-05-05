@@ -5,13 +5,9 @@ builder.Services.AddReverseProxy()
 
 
 // This is the HTTP/2 endpoint to register this app as part of the cluster endpoint
-var url = "https://localhost:7244/connect-h2?clusterId=alpha";
+var url = builder.Configuration["Tunnel:Url"]!;
 
-builder.WebHost.UseTunnelTransport(url, options =>
-{
-    options.MaxConnectionCount = 1;
-    options.Transport = TransportType.HTTP2;
-});
+builder.WebHost.UseTunnelTransport(url);
 
 var app = builder.Build();
 
