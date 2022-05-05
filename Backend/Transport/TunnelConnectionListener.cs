@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets;
 using Microsoft.Extensions.Logging.Abstractions;
 
 /// <summary>
-/// This has the core logic that creates and maintains connections to the proxu.
+/// This has the core logic that creates and maintains connections to the proxy.
 /// </summary>
 internal class TunnelConnectionListener : IConnectionListener
 {

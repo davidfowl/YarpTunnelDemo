@@ -1,7 +1,7 @@
 ﻿using System.Net.WebSockets;
 using Yarp.ReverseProxy.Forwarder;
 
-public static class TunnelEndpointBuilderExtensions
+public static class TunnelExensions
 {
     public static IServiceCollection AddTunnelServices(this IServiceCollection services)
     {
