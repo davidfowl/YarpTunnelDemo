@@ -1,13 +1,15 @@
-using System.Net;
 using System.Net.WebSockets;
-using System.Threading.Channels;
-using Microsoft.AspNetCore.Connections;
 using Yarp.ReverseProxy.Forwarder;
 
 // The queue of available connections. In a real implementation, we'd key this by cluster
-var channel = Channel.CreateUnbounded<Stream>();
+var tunnelFactory = new TunnelClientFactory();
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddReverseProxy()
+       .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+
+builder.Services.AddSingleton<IForwarderHttpClientFactory>(tunnelFactory);
 
 builder.WebHost.ConfigureKestrel(o =>
 {
@@ -17,52 +19,34 @@ builder.WebHost.ConfigureKestrel(o =>
     // http
     o.ListenLocalhost(5244);
 
-    // TCP for tunnel
-    o.Listen(IPAddress.Loopback, 5005, c => c.Run(async context =>
-    {
-        var stream = new ConnectionContextStream(context);
+    //// TCP for tunnel
+    // Need to send the cluster id over tcp, it could be a simple protocol
+    // maybe JSON or something else.
+    //o.Listen(IPAddress.Loopback, 5005, c => c.Run(async context =>
+    //{
+    //    var stream = new ConnectionContextStream(context);
 
-        // This doesn't have a great way to map to individual clusters, but for demo
-        // purposes, show how TCP can be used to connections from the backend
-        while (!context.ConnectionClosed.IsCancellationRequested)
-        {
-            // Make this connection available for requests
-            channel.Writer.TryWrite(stream);
+    //    // This doesn't have a great way to map to individual clusters, but for demo
+    //    // purposes, show how TCP can be used to connections from the backend
+    //    while (!context.ConnectionClosed.IsCancellationRequested)
+    //    {
+    //        // Make this connection available for requests
+    //        channel.Writer.TryWrite(stream);
 
-            await stream.StreamCompleteTask;
+    //        await stream.StreamCompleteTask;
 
-            stream.Reset();
-        }
-    }));
+    //        stream.Reset();
+    //    }
+    //}));
 });
-
-builder.Services.AddHttpForwarder();
 
 var app = builder.Build();
 
-var handler = new SocketsHttpHandler
-{
-    // Uncomment to demonstrate connection pooling disabling reusing connections
-    // from the backend
-    // PooledConnectionLifetime = TimeSpan.FromSeconds(0),
-    ConnectCallback = async (context, cancellationToken) =>
-    {
-        return await channel.Reader.ReadAsync(cancellationToken);
-    }
-};
-var client = new HttpMessageInvoker(handler);
-
 app.UseWebSockets();
 
-app.Map("{*path}", async (IHttpForwarder forwarder, HttpContext context) =>
-{
-    // The address here doesn't matter, we're routing to pre-existing connections
-    await forwarder.SendAsync(context, "http://localhost", client);
+app.MapReverseProxy();
 
-    return Results.Empty;
-});
-
-app.MapPost("/connect-h2", async (HttpContext context, IHostApplicationLifetime lifetime) =>
+app.MapPost("/connect-h2", async (HttpContext context, string clusterId, IHostApplicationLifetime lifetime) =>
 {
     // HTTP/2 duplex stream
     if (context.Request.Protocol != HttpProtocol.Http2)
@@ -73,6 +57,8 @@ app.MapPost("/connect-h2", async (HttpContext context, IHostApplicationLifetime 
     var stream = new DuplexHttpStream(context);
 
     using var reg = lifetime.ApplicationStopping.Register(() => stream.Shutdown());
+
+    var channel = tunnelFactory.GetConnectionChannel(clusterId);
 
     // Keep reusing this connection while, it's still open on the backend
     while (!context.RequestAborted.IsCancellationRequested)
@@ -91,7 +77,7 @@ app.MapPost("/connect-h2", async (HttpContext context, IHostApplicationLifetime 
 // This path should only be exposed on an internal port, the backend connects
 // to this endpoint to register a connection with a specific cluster. To further secure this, authentication
 // could be added (shared secret, JWT etc etc)
-app.MapGet("/connect-ws", async (HttpContext context, IHostApplicationLifetime lifetime) =>
+app.MapGet("/connect-ws", async (HttpContext context, string clusterId, IHostApplicationLifetime lifetime) =>
 {
     if (!context.WebSockets.IsWebSocketRequest)
     {
@@ -103,6 +89,8 @@ app.MapGet("/connect-ws", async (HttpContext context, IHostApplicationLifetime l
     var ws = await context.WebSockets.AcceptWebSocketAsync();
 
     var stream = new WebSocketStream(ws);
+
+    var channel = tunnelFactory.GetConnectionChannel(clusterId);
 
     // We should make this more graceful
     using var reg = lifetime.ApplicationStopping.Register(() => stream.Shutdown());

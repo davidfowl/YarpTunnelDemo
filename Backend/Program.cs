@@ -18,7 +18,7 @@ builder.WebHost.ConfigureKestrel(o =>
     // o.Listen(new UriEndPoint(new("https://localhost:7244/connect-ws")));
 
     // H2
-    o.Listen(new UriEndPoint(new("https://localhost:7244/connect-h2")));
+    o.Listen(new UriEndPoint(new("https://localhost:7244/connect-h2?clusterId=alpha")));
 });
 
 var app = builder.Build();
