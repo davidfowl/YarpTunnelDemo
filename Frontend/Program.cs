@@ -1,7 +1,7 @@
 using System.Net.WebSockets;
 using Yarp.ReverseProxy.Forwarder;
 
-// The queue of available connections. In a real implementation, we'd key this by cluster
+
 var tunnelFactory = new TunnelClientFactory();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -83,8 +83,6 @@ app.MapGet("/connect-ws", async (HttpContext context, string clusterId, IHostApp
     {
         return Results.BadRequest();
     }
-
-    // REVIEW: Use the path to register this connection per cluster
 
     var ws = await context.WebSockets.AcceptWebSocketAsync();
 

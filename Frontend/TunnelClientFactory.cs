@@ -2,6 +2,9 @@
 using System.Threading.Channels;
 using Yarp.ReverseProxy.Forwarder;
 
+/// <summary>
+/// The factory that YARP will use the create outbound connections by cluster id.
+/// </summary>
 internal class TunnelClientFactory : IForwarderHttpClientFactory
 {
     private readonly ConcurrentDictionary<string, (HttpMessageInvoker, Channel<Stream>)> _clusterConnections = new();

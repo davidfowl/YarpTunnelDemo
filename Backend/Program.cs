@@ -1,7 +1,9 @@
-using System.Net;
 using Microsoft.AspNetCore.Connections;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddReverseProxy()
+       .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
 builder.WebHost.UseTunnelTransport(o =>
 {
@@ -11,9 +13,6 @@ builder.WebHost.UseTunnelTransport(o =>
 
 builder.WebHost.ConfigureKestrel(o =>
 {
-    // TCP
-    // o.Listen(IPAddress.Loopback, 5005);
-
     // WebSockets
     // o.Listen(new UriEndPoint(new("https://localhost:7244/connect-ws")));
 
@@ -23,6 +22,6 @@ builder.WebHost.ConfigureKestrel(o =>
 
 var app = builder.Build();
 
-app.MapGet("/", () => "Hello World!");
+app.MapReverseProxy();
 
 app.Run();
