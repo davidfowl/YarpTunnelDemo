@@ -8,6 +8,5 @@
 public enum TransportType
 {
     WebSockets,
-    HTTP2,
-    TCP
+    HTTP2
 }

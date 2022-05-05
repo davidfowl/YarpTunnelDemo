@@ -14,7 +14,6 @@ internal class TunnelConnectionListener : IConnectionListener
     private readonly ConcurrentDictionary<ConnectionContext, ConnectionContext> _connections = new();
     private readonly TunnelOptions _options;
     private readonly CancellationTokenSource _closedCts = new();
-    private readonly SocketConnectionContextFactory _contextFactory = new(new SocketConnectionFactoryOptions(), NullLogger.Instance);
     private readonly HttpMessageInvoker _httpMessageInvoker = new(new SocketsHttpHandler
     {
         EnableMultipleHttp2Connections = true
@@ -26,23 +25,9 @@ internal class TunnelConnectionListener : IConnectionListener
         _connectionLock = new(options.MaxConnectionCount);
         EndPoint = endpoint;
 
-        switch (options.Transport)
+        if (endpoint is not UriEndPoint)
         {
-            case TransportType.HTTP2:
-            case TransportType.WebSockets:
-                if (endpoint is not UriEndPoint)
-                {
-                    throw new NotSupportedException($"UriEndPoint is required for {options.Transport} transport");
-                }
-                break;
-            case TransportType.TCP:
-                if (endpoint is not IPEndPoint)
-                {
-                    throw new NotSupportedException("IPEndPoint is required for tcp transport");
-                }
-                break;
-            default:
-                break;
+            throw new NotSupportedException($"UriEndPoint is required for {options.Transport} transport");
         }
     }
 
@@ -60,7 +45,6 @@ internal class TunnelConnectionListener : IConnectionListener
             var connection = new TrackLifetimeConnectionContext(_options.Transport switch
             {
                 TransportType.WebSockets => await WebSocketConnectionContext.ConnectAsync(((UriEndPoint)EndPoint).Uri, cancellationToken),
-                TransportType.TCP => await ConnectSocketAsync((IPEndPoint)EndPoint),
                 TransportType.HTTP2 => await HttpClientConnectionContext.ConnectAsync(_httpMessageInvoker, ((UriEndPoint)EndPoint).Uri, cancellationToken),
                 _ => throw new NotSupportedException(),
             });
@@ -86,14 +70,6 @@ internal class TunnelConnectionListener : IConnectionListener
             return null;
         }
     }
-
-    private async ValueTask<ConnectionContext> ConnectSocketAsync(IPEndPoint endPoint)
-    {
-        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-        await socket.ConnectAsync(endPoint);
-        return _contextFactory.Create(socket);
-    }
-
     public async ValueTask DisposeAsync()
     {
         List<Task>? tasks = null;
