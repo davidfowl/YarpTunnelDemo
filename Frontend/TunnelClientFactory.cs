@@ -24,10 +24,7 @@ internal class TunnelClientFactory : ForwarderHttpClientFactory
         {
             var channel = GetConnectionChannel(context.ClusterId);
 
-            handler.ConnectCallback = async (context, cancellationToken) =>
-            {
-                return await channel.Reader.ReadAsync(cancellationToken);
-            };
+            handler.ConnectCallback = (context, cancellationToken) => channel.Reader.ReadAsync(cancellationToken);
         }
     }
 }
