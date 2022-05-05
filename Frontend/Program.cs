@@ -56,8 +56,8 @@ app.UseWebSockets();
 
 app.Map("{*path}", async (IHttpForwarder forwarder, HttpContext context) =>
 {
-    // This is hardcoded to a single backend, but that's just for the demo
-    await forwarder.SendAsync(context, "http://woah/", client);
+    // The address here doesn't matter, we're routing to pre-existing connections
+    await forwarder.SendAsync(context, "http://localhost", client);
 
     return Results.Empty;
 });
