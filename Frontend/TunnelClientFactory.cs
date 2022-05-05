@@ -5,42 +5,29 @@ using Yarp.ReverseProxy.Forwarder;
 /// <summary>
 /// The factory that YARP will use the create outbound connections by cluster id.
 /// </summary>
-internal class TunnelClientFactory : IForwarderHttpClientFactory
+internal class TunnelClientFactory : ForwarderHttpClientFactory
 {
-    private readonly ConcurrentDictionary<string, (HttpMessageInvoker, Channel<Stream>)> _clusterConnections = new();
+    private readonly ConcurrentDictionary<string, Channel<Stream>> _clusterConnections = new();
 
     public Channel<Stream> GetConnectionChannel(string clusterId)
     {
-        var (_, channel) = GetOrCreateEntry(clusterId);
-        return channel;
+        return _clusterConnections.GetOrAdd(clusterId, _ => Channel.CreateUnbounded<Stream>());
     }
 
-    public HttpMessageInvoker CreateClient(ForwarderHttpClientContext context)
+    protected override void ConfigureHandler(ForwarderHttpClientContext context, SocketsHttpHandler handler)
     {
-        var (invoker, _) = GetOrCreateEntry(context.ClusterId);
+        base.ConfigureHandler(context, handler);
 
-        return invoker;
-    }
-
-    private (HttpMessageInvoker, Channel<Stream>) GetOrCreateEntry(string clusterId)
-    {
-        return _clusterConnections.GetOrAdd(clusterId, static (id) =>
+        // Overwrite if needed
+        if (context.NewMetadata != null && context.NewMetadata.TryGetValue("tunnel", out var tunnelValue) &&
+            bool.TryParse(tunnelValue, out var tunnel) && tunnel)
         {
-            // The connection pool we're going to use for this cluster
-            var channel = Channel.CreateUnbounded<Stream>();
+            var channel = GetConnectionChannel(context.ClusterId);
 
-            var handler = new SocketsHttpHandler
+            handler.ConnectCallback = async (context, cancellationToken) =>
             {
-                // Uncomment to demonstrate connection pooling disabling reusing connections
-                // from the backend
-                // PooledConnectionLifetime = TimeSpan.FromSeconds(0),
-                ConnectCallback = async (context, cancellationToken) =>
-                {
-                    return await channel.Reader.ReadAsync(cancellationToken);
-                }
+                return await channel.Reader.ReadAsync(cancellationToken);
             };
-
-            return (new HttpMessageInvoker(handler), channel);
-        });
+        }
     }
 }
