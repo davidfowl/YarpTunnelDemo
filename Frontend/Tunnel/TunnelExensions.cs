@@ -13,7 +13,7 @@ public static class TunnelExensions
 
     public static IEndpointConventionBuilder MapHttp2Tunnel(this IEndpointRouteBuilder routes, string path)
     {
-        return routes.MapPost(path, static async (HttpContext context, string clusterId, TunnelClientFactory tunnelFactory, IHostApplicationLifetime lifetime) =>
+        return routes.MapPost(path, static async (HttpContext context, string host, TunnelClientFactory tunnelFactory, IHostApplicationLifetime lifetime) =>
         {
             // HTTP/2 duplex stream
             if (context.Request.Protocol != HttpProtocol.Http2)
@@ -25,7 +25,7 @@ public static class TunnelExensions
 
             using var reg = lifetime.ApplicationStopping.Register(() => stream.Shutdown());
 
-            var channel = tunnelFactory.GetConnectionChannel(clusterId);
+            var channel = tunnelFactory.GetConnectionChannel(host);
 
             // Keep reusing this connection while, it's still open on the backend
             while (!context.RequestAborted.IsCancellationRequested)
@@ -44,7 +44,7 @@ public static class TunnelExensions
 
     public static IEndpointConventionBuilder MapWebSocketTunnel(this IEndpointRouteBuilder routes, string path)
     {
-        return routes.MapGet(path, static async (HttpContext context, string clusterId, TunnelClientFactory tunnelFactory, IHostApplicationLifetime lifetime) =>
+        return routes.MapGet(path, static async (HttpContext context, string host, TunnelClientFactory tunnelFactory, IHostApplicationLifetime lifetime) =>
         {
             if (!context.WebSockets.IsWebSocketRequest)
             {
@@ -55,7 +55,7 @@ public static class TunnelExensions
 
             var stream = new WebSocketStream(ws);
 
-            var channel = tunnelFactory.GetConnectionChannel(clusterId);
+            var channel = tunnelFactory.GetConnectionChannel(host);
 
             // We should make this more graceful
             using var reg = lifetime.ApplicationStopping.Register(() => stream.Shutdown());

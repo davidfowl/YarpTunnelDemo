@@ -75,7 +75,7 @@ internal class HttpClientConnectionContext : ConnectionContext,
         request.Content = new HttpClientConnectionContextContent(connection);
         var response = await invoker.SendAsync(request, cancellationToken).ConfigureAwait(false);
         connection.HttpResponseMessage = response;
-        var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
         connection.Input = PipeReader.Create(responseStream);
 
         return connection;

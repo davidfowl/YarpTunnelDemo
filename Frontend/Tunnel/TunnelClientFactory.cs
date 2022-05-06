@@ -4,15 +4,15 @@ using System.Threading.Channels;
 using Yarp.ReverseProxy.Forwarder;
 
 /// <summary>
-/// The factory that YARP will use the create outbound connections by cluster id.
+/// The factory that YARP will use the create outbound connections by host name.
 /// </summary>
 internal class TunnelClientFactory : ForwarderHttpClientFactory
 {
     private readonly ConcurrentDictionary<string, Channel<Stream>> _clusterConnections = new();
 
-    public Channel<Stream> GetConnectionChannel(string clusterId)
+    public Channel<Stream> GetConnectionChannel(string host)
     {
-        return _clusterConnections.GetOrAdd(clusterId, _ => Channel.CreateUnbounded<Stream>());
+        return _clusterConnections.GetOrAdd(host, _ => Channel.CreateUnbounded<Stream>());
     }
 
     protected override void ConfigureHandler(ForwarderHttpClientContext context, SocketsHttpHandler handler)
@@ -28,11 +28,9 @@ internal class TunnelClientFactory : ForwarderHttpClientFactory
             return new NetworkStream(socket, ownsSocket: true);
         }
 
-        var channel = GetConnectionChannel(context.ClusterId);
-
         handler.ConnectCallback = (context, cancellationToken) =>
         {
-            if (context.DnsEndPoint.Host == "transport.tunnel")
+            if (_clusterConnections.TryGetValue(context.DnsEndPoint.Host, out var channel))
             {
                 return channel.Reader.ReadAsync(cancellationToken);
             }
