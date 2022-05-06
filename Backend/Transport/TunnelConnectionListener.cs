@@ -1,9 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
-using System.Net.Sockets;
 using Microsoft.AspNetCore.Connections;
-using Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets;
-using Microsoft.Extensions.Logging.Abstractions;
 
 /// <summary>
 /// This has the core logic that creates and maintains connections to the proxy.
@@ -16,7 +13,9 @@ internal class TunnelConnectionListener : IConnectionListener
     private readonly CancellationTokenSource _closedCts = new();
     private readonly HttpMessageInvoker _httpMessageInvoker = new(new SocketsHttpHandler
     {
-        EnableMultipleHttp2Connections = true
+        EnableMultipleHttp2Connections = true,
+        PooledConnectionLifetime = Timeout.InfiniteTimeSpan,
+        PooledConnectionIdleTimeout = Timeout.InfiniteTimeSpan
     });
 
     public TunnelConnectionListener(TunnelOptions options, EndPoint endpoint)
