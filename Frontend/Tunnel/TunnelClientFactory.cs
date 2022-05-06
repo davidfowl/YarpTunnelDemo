@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Net.Sockets;
 using System.Threading.Channels;
 using Yarp.ReverseProxy.Forwarder;
 
@@ -18,13 +19,24 @@ internal class TunnelClientFactory : ForwarderHttpClientFactory
     {
         base.ConfigureHandler(context, handler);
 
-        // Overwrite if needed
-        if (context.NewMetadata != null && context.NewMetadata.TryGetValue("tunnel", out var tunnelValue) &&
-            bool.TryParse(tunnelValue, out var tunnel) && tunnel)
-        {
-            var channel = GetConnectionChannel(context.ClusterId);
+        var previous = handler.ConnectCallback ?? DefaultConnectCallback;
 
-            handler.ConnectCallback = (context, cancellationToken) => channel.Reader.ReadAsync(cancellationToken);
+        static async ValueTask<Stream> DefaultConnectCallback(SocketsHttpConnectionContext context, CancellationToken cancellationToken)
+        {
+            var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            await socket.ConnectAsync(context.DnsEndPoint);
+            return new NetworkStream(socket, ownsSocket: true);
         }
+
+        var channel = GetConnectionChannel(context.ClusterId);
+
+        handler.ConnectCallback = (context, cancellationToken) =>
+        {
+            if (context.DnsEndPoint.Host == "transport.tunnel")
+            {
+                return channel.Reader.ReadAsync(cancellationToken);
+            }
+            return previous(context, cancellationToken);
+        };
     }
 }

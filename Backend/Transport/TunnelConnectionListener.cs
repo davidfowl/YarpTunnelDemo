@@ -33,6 +33,8 @@ internal class TunnelConnectionListener : IConnectionListener
 
     public EndPoint EndPoint { get; }
 
+    private Uri Uri => ((UriEndPoint)EndPoint).Uri;
+
     public async ValueTask<ConnectionContext?> AcceptAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -44,8 +46,8 @@ internal class TunnelConnectionListener : IConnectionListener
 
             var connection = new TrackLifetimeConnectionContext(_options.Transport switch
             {
-                TransportType.WebSockets => await WebSocketConnectionContext.ConnectAsync(((UriEndPoint)EndPoint).Uri, cancellationToken),
-                TransportType.HTTP2 => await HttpClientConnectionContext.ConnectAsync(_httpMessageInvoker, ((UriEndPoint)EndPoint).Uri, cancellationToken),
+                TransportType.WebSockets => await WebSocketConnectionContext.ConnectAsync(Uri, cancellationToken),
+                TransportType.HTTP2 => await HttpClientConnectionContext.ConnectAsync(_httpMessageInvoker, Uri, cancellationToken),
                 _ => throw new NotSupportedException(),
             });
 
