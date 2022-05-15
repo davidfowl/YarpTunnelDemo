@@ -37,6 +37,10 @@ public static class TunnelExensions
 
                 stream.Reset();
             }
+            
+            channel.Writer.TryComplete();
+
+            tunnelFactory.RemoveHost(host);
 
             return Results.Empty;
         });
@@ -70,6 +74,10 @@ public static class TunnelExensions
 
                 stream.Reset();
             }
+            
+            channel.Writer.TryComplete();
+
+            tunnelFactory.RemoveHost(host);
 
             return Results.Empty;
         });

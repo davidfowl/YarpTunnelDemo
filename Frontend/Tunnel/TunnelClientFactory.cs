@@ -15,6 +15,8 @@ internal class TunnelClientFactory : ForwarderHttpClientFactory
         return _clusterConnections.GetOrAdd(host, _ => Channel.CreateUnbounded<Stream>());
     }
 
+    public void RemoveHost(string host) => _clusterConnections.TryRemove(host, out _);
+
     protected override void ConfigureHandler(ForwarderHttpClientContext context, SocketsHttpHandler handler)
     {
         base.ConfigureHandler(context, handler);
