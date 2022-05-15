@@ -27,44 +27,24 @@ internal class DuplexHttpStream : Stream, IValueTaskSource<object?>
 
     public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
-    public override void Flush()
-    {
-        throw new NotSupportedException();
-    }
-
-    public override int Read(byte[] buffer, int offset, int count)
-    {
-        throw new NotSupportedException();
-    }
-
-    public override long Seek(long offset, SeekOrigin origin)
-    {
-        throw new NotSupportedException();
-    }
-
-    public override void SetLength(long value)
-    {
-        throw new NotSupportedException();
-    }
-
-    public override void Write(byte[] buffer, int offset, int count)
-    {
-        throw new NotSupportedException();
-    }
     public override Task FlushAsync(CancellationToken cancellationToken)
     {
         return Task.CompletedTask;
     }
 
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
-    {
-        return ResponseBody.WriteAsync(buffer, cancellationToken);
-    }
+     => ResponseBody.WriteAsync(buffer, cancellationToken);
 
     public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
-    {
-        return RequestBody.ReadAsync(buffer, cancellationToken);
-    }
+     => RequestBody.ReadAsync(buffer, cancellationToken);
+
+    public object? GetResult(short token) => _tcs.GetResult(token);
+
+    public void Reset() => _tcs.Reset();
+
+    public ValueTaskSourceStatus GetStatus(short token) => _tcs.GetStatus(token);
+    public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) =>
+        _tcs.OnCompleted(continuation, state, token, flags);
 
     internal void Shutdown()
     {
@@ -97,23 +77,28 @@ internal class DuplexHttpStream : Stream, IValueTaskSource<object?>
         }
     }
 
-    public object? GetResult(short token)
+    public override void Flush()
     {
-        return _tcs.GetResult(token);
+        throw new NotSupportedException();
     }
 
-    public void Reset()
+    public override int Read(byte[] buffer, int offset, int count)
     {
-        _tcs.Reset();
+        throw new NotSupportedException();
     }
 
-    public ValueTaskSourceStatus GetStatus(short token)
+    public override long Seek(long offset, SeekOrigin origin)
     {
-        return _tcs.GetStatus(token);
+        throw new NotSupportedException();
     }
 
-    public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
+    public override void SetLength(long value)
     {
-        _tcs.OnCompleted(continuation, state, token, flags);
+        throw new NotSupportedException();
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
     }
 }
