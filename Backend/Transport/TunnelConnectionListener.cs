@@ -24,7 +24,7 @@ internal class TunnelConnectionListener : IConnectionListener
         _connectionLock = new(options.MaxConnectionCount);
         EndPoint = endpoint;
 
-        if (endpoint is not UriEndPoint)
+        if (endpoint is not UriEndPoint2)
         {
             throw new NotSupportedException($"UriEndPoint is required for {options.Transport} transport");
         }
@@ -32,7 +32,7 @@ internal class TunnelConnectionListener : IConnectionListener
 
     public EndPoint EndPoint { get; }
 
-    private Uri Uri => ((UriEndPoint)EndPoint).Uri;
+    private Uri Uri => ((UriEndPoint2)EndPoint).Uri;
 
     public async ValueTask<ConnectionContext?> AcceptAsync(CancellationToken cancellationToken = default)
     {

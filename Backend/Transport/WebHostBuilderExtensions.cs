@@ -10,7 +10,7 @@ public static class WebHostBuilderExtensions
 
         hostBuilder.ConfigureKestrel(options =>
         {
-            options.Listen(new UriEndPoint(new Uri(url)));
+            options.Listen(new UriEndPoint2(new Uri(url)));
         });
 
         return hostBuilder.ConfigureServices(services =>

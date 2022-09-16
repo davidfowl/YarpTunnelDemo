@@ -42,7 +42,7 @@ public static class TunnelExensions
 
             tunnelFactory.RemoveHost(host);
 
-            return Results.Empty;
+            return EmptyResult.Instance;
         });
     }
 
@@ -79,7 +79,18 @@ public static class TunnelExensions
 
             tunnelFactory.RemoveHost(host);
 
-            return Results.Empty;
+            return EmptyResult.Instance;
         });
+    }
+
+    // This is for .NET 6, .NET 7 has Results.Empty
+    internal sealed class EmptyResult : IResult
+    {
+        internal static readonly EmptyResult Instance = new();
+
+        public Task ExecuteAsync(HttpContext httpContext)
+        {
+            return Task.CompletedTask;
+        }
     }
 }
