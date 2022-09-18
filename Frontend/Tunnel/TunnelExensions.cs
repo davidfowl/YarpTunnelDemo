@@ -37,10 +37,6 @@ public static class TunnelExensions
 
                 stream.Reset();
             }
-            
-            channel.Writer.TryComplete();
-
-            tunnelFactory.RemoveHost(host);
 
             return EmptyResult.Instance;
         });
@@ -48,7 +44,7 @@ public static class TunnelExensions
 
     public static IEndpointConventionBuilder MapWebSocketTunnel(this IEndpointRouteBuilder routes, string path)
     {
-        return routes.MapGet(path, static async (HttpContext context, string host, TunnelClientFactory tunnelFactory, IHostApplicationLifetime lifetime) =>
+        var conventionBuilder = routes.MapGet(path, static async (HttpContext context, string host, TunnelClientFactory tunnelFactory, IHostApplicationLifetime lifetime) =>
         {
             if (!context.WebSockets.IsWebSocketRequest)
             {
@@ -74,13 +70,19 @@ public static class TunnelExensions
 
                 stream.Reset();
             }
-            
-            channel.Writer.TryComplete();
-
-            tunnelFactory.RemoveHost(host);
 
             return EmptyResult.Instance;
         });
+
+        // Make this endpoint do websockets automagically as middleware for this specific route
+        conventionBuilder.Add(e =>
+        {
+            var sub = routes.CreateApplicationBuilder();
+            sub.UseWebSockets().Run(e.RequestDelegate!);
+            e.RequestDelegate = sub.Build();
+        });
+
+        return conventionBuilder;
     }
 
     // This is for .NET 6, .NET 7 has Results.Empty

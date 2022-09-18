@@ -8,14 +8,14 @@ using Yarp.ReverseProxy.Forwarder;
 /// </summary>
 internal class TunnelClientFactory : ForwarderHttpClientFactory
 {
+    // TODO: These values should be populated by configuration so there's no need to remove
+    // channels.
     private readonly ConcurrentDictionary<string, Channel<Stream>> _clusterConnections = new();
 
     public Channel<Stream> GetConnectionChannel(string host)
     {
         return _clusterConnections.GetOrAdd(host, _ => Channel.CreateUnbounded<Stream>());
     }
-
-    public void RemoveHost(string host) => _clusterConnections.TryRemove(host, out _);
 
     protected override void ConfigureHandler(ForwarderHttpClientContext context, SocketsHttpHandler handler)
     {

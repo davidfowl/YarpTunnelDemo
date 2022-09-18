@@ -31,6 +31,14 @@ internal class WebSocketConnectionContext : HttpConnection
         _underlyingWebSocket?.Abort();
     }
 
+    public override ValueTask DisposeAsync()
+    {
+        // REVIEW: Why doesn't dispose just work?
+        Abort();
+
+        return base.DisposeAsync();
+    }
+
     internal static async ValueTask<WebSocketConnectionContext> ConnectAsync(Uri uri, CancellationToken cancellationToken)
     {
         ClientWebSocket? underlyingWebSocket = null;

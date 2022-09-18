@@ -32,7 +32,7 @@ internal class TunnelConnectionListener : IConnectionListener
 
     public EndPoint EndPoint { get; }
 
-    private Uri Uri => ((UriEndPoint2)EndPoint).Uri;
+    private Uri Uri => ((UriEndPoint2)EndPoint).Uri!;
 
     public async ValueTask<ConnectionContext?> AcceptAsync(CancellationToken cancellationToken = default)
     {
@@ -43,28 +43,42 @@ internal class TunnelConnectionListener : IConnectionListener
             // Kestrel will keep an active accept call open as long as the transport is active
             await _connectionLock.WaitAsync(cancellationToken);
 
-            var connection = new TrackLifetimeConnectionContext(_options.Transport switch
+            while (true)
             {
-                TransportType.WebSockets => await WebSocketConnectionContext.ConnectAsync(Uri, cancellationToken),
-                TransportType.HTTP2 => await HttpClientConnectionContext.ConnectAsync(_httpMessageInvoker, Uri, cancellationToken),
-                _ => throw new NotSupportedException(),
-            });
+                try
+                {
+                    var connection = new TrackLifetimeConnectionContext(_options.Transport switch
+                    {
+                        TransportType.WebSockets => await WebSocketConnectionContext.ConnectAsync(Uri, cancellationToken),
+                        TransportType.HTTP2 => await HttpClientConnectionContext.ConnectAsync(_httpMessageInvoker, Uri, cancellationToken),
+                        _ => throw new NotSupportedException(),
+                    });
 
-            // Track this connection lifetime
-            _connections.TryAdd(connection, connection);
+                    // Track this connection lifetime
+                    _connections.TryAdd(connection, connection);
 
-            _ = Task.Run(async () =>
-            {
-                // When the connection is disposed, release it
-                await connection.ExecutionTask;
+                    _ = Task.Run(async () =>
+                    {
+                        // When the connection is disposed, release it
+                        await connection.ExecutionTask;
 
-                _connections.TryRemove(connection, out _);
-                // Allow more connections in
-                _connectionLock.Release();
-            },
-            cancellationToken);
+                        _connections.TryRemove(connection, out _);
 
-            return connection;
+                        // Allow more connections in
+                        _connectionLock.Release();
+                    },
+                    cancellationToken);
+
+                    return connection;
+                }
+                catch
+                {
+                    _connectionLock.Release();
+
+                    // TODO: More sophisticated backoff and retry
+                    await Task.Delay(5000, cancellationToken);
+                }
+            }
         }
         catch (OperationCanceledException)
         {

@@ -46,7 +46,7 @@ internal class HttpClientConnectionContext : ConnectionContext,
 
     public HttpResponseMessage HttpResponseMessage { get; set; } = default!;
 
-    public override void Abort(ConnectionAbortedException abortReason)
+    public override void Abort()
     {
         HttpResponseMessage.Dispose();
 
@@ -56,11 +56,14 @@ internal class HttpClientConnectionContext : ConnectionContext,
         Output.CancelPendingFlush();
     }
 
+    public override void Abort(ConnectionAbortedException abortReason)
+    {
+        Abort();
+    }
+
     public override ValueTask DisposeAsync()
     {
-        HttpResponseMessage.Dispose();
-
-        _executionTcs.TrySetResult();
+        Abort();
 
         return base.DisposeAsync();
     }
