@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks.Sources;
 
-internal class DuplexHttpStream : Stream, IValueTaskSource<object?>
+internal class DuplexHttpStream : Stream, IValueTaskSource<object?>, ICloseable
 {
     private ManualResetValueTaskSourceCore<object?> _tcs = new() { RunContinuationsAsynchronously = true };
     private readonly object _sync = new();
@@ -16,6 +16,8 @@ internal class DuplexHttpStream : Stream, IValueTaskSource<object?>
     private Stream ResponseBody => _context.Response.Body;
 
     internal ValueTask<object?> StreamCompleteTask => new(this, _tcs.Version);
+
+    public bool IsClosed => _context.RequestAborted.IsCancellationRequested;
 
     public override bool CanRead => true;
 
@@ -46,7 +48,7 @@ internal class DuplexHttpStream : Stream, IValueTaskSource<object?>
     public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) =>
         _tcs.OnCompleted(continuation, state, token, flags);
 
-    internal void Shutdown()
+    public void Abort()
     {
         _context.Abort();
 

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.IO;
 using System.Net.Sockets;
 using System.Threading.Channels;
 using Yarp.ReverseProxy.Forwarder;
@@ -10,11 +11,11 @@ internal class TunnelClientFactory : ForwarderHttpClientFactory
 {
     // TODO: These values should be populated by configuration so there's no need to remove
     // channels.
-    private readonly ConcurrentDictionary<string, Channel<Stream>> _clusterConnections = new();
+    private readonly ConcurrentDictionary<string, (Channel<int>, Channel<Stream>)> _clusterConnections = new();
 
-    public Channel<Stream> GetConnectionChannel(string host)
+    public (Channel<int>, Channel<Stream>) GetConnectionChannel(string host)
     {
-        return _clusterConnections.GetOrAdd(host, _ => Channel.CreateUnbounded<Stream>());
+        return _clusterConnections.GetOrAdd(host, _ => (Channel.CreateUnbounded<int>(), Channel.CreateUnbounded<Stream>()));
     }
 
     protected override void ConfigureHandler(ForwarderHttpClientContext context, SocketsHttpHandler handler)
@@ -38,13 +39,28 @@ internal class TunnelClientFactory : ForwarderHttpClientFactory
             }
         }
 
-        handler.ConnectCallback = (context, cancellationToken) =>
+        handler.ConnectCallback = async (context, cancellationToken) =>
         {
-            if (_clusterConnections.TryGetValue(context.DnsEndPoint.Host, out var channel))
+            if (_clusterConnections.TryGetValue(context.DnsEndPoint.Host, out var pair))
             {
-                return channel.Reader.ReadAsync(cancellationToken);
+                var (requests, responses) = pair;
+
+                // Ask for a connection
+                await requests.Writer.WriteAsync(0, cancellationToken);
+
+                while (true)
+                {
+                    var stream = await responses.Reader.ReadAsync(cancellationToken);
+
+                    if (stream is ICloseable c && c.IsClosed)
+                    {
+                        continue;
+                    }
+
+                    return stream;
+                }
             }
-            return previous(context, cancellationToken);
+            return await previous(context, cancellationToken);
         };
     }
 }

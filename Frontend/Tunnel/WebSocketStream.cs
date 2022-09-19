@@ -2,7 +2,7 @@
 using System.Net.WebSockets;
 using System.Threading.Tasks.Sources;
 
-internal class WebSocketStream : Stream, IValueTaskSource<object?>
+internal class WebSocketStream : Stream, IValueTaskSource<object?>, ICloseable
 {
     private readonly WebSocket _ws;
     private ManualResetValueTaskSourceCore<object?> _tcs = new() { RunContinuationsAsynchronously = true };
@@ -14,6 +14,7 @@ internal class WebSocketStream : Stream, IValueTaskSource<object?>
     }
 
     internal ValueTask<object?> StreamCompleteTask => new(this, _tcs.Version);
+    public bool IsClosed => _ws.State != WebSocketState.Open;
 
     public override bool CanRead => true;
 
@@ -71,9 +72,9 @@ internal class WebSocketStream : Stream, IValueTaskSource<object?>
         return result.Count;
     }
 
-    internal void Shutdown()
+    public void Abort()
     {
-        Debug.Assert(!Thread.CurrentThread.IsThreadPoolThread);
+        // Debug.Assert(!Thread.CurrentThread.IsThreadPoolThread);
         _ws.Abort();
 
         // The shutdown path is currently synchronous but at least we're not blocking a threadpool thread

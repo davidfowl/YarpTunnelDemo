@@ -21,17 +21,19 @@ public static class TunnelExensions
                 return Results.BadRequest();
             }
 
+            var (requests, responses) = tunnelFactory.GetConnectionChannel(host);
+
+            await requests.Reader.ReadAsync(context.RequestAborted);
+
             var stream = new DuplexHttpStream(context);
 
-            using var reg = lifetime.ApplicationStopping.Register(() => stream.Shutdown());
-
-            var channel = tunnelFactory.GetConnectionChannel(host);
+            using var reg = lifetime.ApplicationStopping.Register(() => stream.Abort());
 
             // Keep reusing this connection while, it's still open on the backend
             while (!context.RequestAborted.IsCancellationRequested)
             {
                 // Make this connection available for requests
-                channel.Writer.TryWrite(stream);
+                responses.Writer.TryWrite(stream);
 
                 await stream.StreamCompleteTask;
 
@@ -51,6 +53,10 @@ public static class TunnelExensions
                 return Results.BadRequest();
             }
 
+            var (requests, responses) = tunnelFactory.GetConnectionChannel(host);
+
+            await requests.Reader.ReadAsync(context.RequestAborted);
+
             var ws = await context.WebSockets.AcceptWebSocketAsync();
 
             var stream = new WebSocketStream(ws);
@@ -58,13 +64,13 @@ public static class TunnelExensions
             var channel = tunnelFactory.GetConnectionChannel(host);
 
             // We should make this more graceful
-            using var reg = lifetime.ApplicationStopping.Register(() => stream.Shutdown());
+            using var reg = lifetime.ApplicationStopping.Register(() => stream.Abort());
 
             // Keep reusing this connection while, it's still open on the backend
             while (ws.State == WebSocketState.Open)
             {
                 // Make this connection available for requests
-                channel.Writer.TryWrite(stream);
+                responses.Writer.TryWrite(stream);
 
                 await stream.StreamCompleteTask;
 
