@@ -54,6 +54,9 @@ internal class TunnelClientFactory : ForwarderHttpClientFactory
 
                     if (stream is ICloseable c && c.IsClosed)
                     {
+                        // Ask for another connection
+                        await requests.Writer.WriteAsync(0, cancellationToken);
+
                         continue;
                     }
 
