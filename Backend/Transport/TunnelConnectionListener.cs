@@ -73,8 +73,6 @@ internal class TunnelConnectionListener : IConnectionListener
                 }
                 catch
                 {
-                    _connectionLock.Release();
-
                     // TODO: More sophisticated backoff and retry
                     await Task.Delay(5000, cancellationToken);
                 }
