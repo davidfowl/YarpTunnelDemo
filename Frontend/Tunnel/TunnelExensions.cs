@@ -61,8 +61,6 @@ public static class TunnelExensions
 
             var stream = new WebSocketStream(ws);
 
-            var channel = tunnelFactory.GetConnectionChannel(host);
-
             // We should make this more graceful
             using var reg = lifetime.ApplicationStopping.Register(() => stream.Abort());
 
