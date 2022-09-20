@@ -33,7 +33,7 @@ public static class TunnelExensions
             while (!context.RequestAborted.IsCancellationRequested)
             {
                 // Make this connection available for requests
-                responses.Writer.TryWrite(stream);
+                await responses.Writer.WriteAsync(stream, context.RequestAborted);
 
                 await stream.StreamCompleteTask;
 
@@ -70,7 +70,7 @@ public static class TunnelExensions
             while (ws.State == WebSocketState.Open)
             {
                 // Make this connection available for requests
-                responses.Writer.TryWrite(stream);
+                await responses.Writer.WriteAsync(stream, context.RequestAborted);
 
                 await stream.StreamCompleteTask;
 
