@@ -45,6 +45,8 @@ internal class TunnelConnectionListener : IConnectionListener
 
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 try
                 {
                     var connection = new TrackLifetimeConnectionContext(_options.Transport switch
@@ -71,7 +73,7 @@ internal class TunnelConnectionListener : IConnectionListener
 
                     return connection;
                 }
-                catch
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     // TODO: More sophisticated backoff and retry
                     await Task.Delay(5000, cancellationToken);
